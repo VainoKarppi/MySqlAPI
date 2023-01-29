@@ -1,0 +1,15 @@
+create table 
+delete table
+table exists
+
+Create Database
+Delete Database
+Database Exists
+
+Add Data to Table
+Has Data with Key = TODO
+Remove Data From DB = TODO
+Update Data = TODO
+
+
+TODO: Add query lineup
