@@ -5,10 +5,288 @@ using MySql.Data.MySqlClient;
 
 
 // WORKING FILES!!!
+namespace MySqlDatabaseAPI;
 
-public partial class Program {
+public static class Database {
+    public static MySqlConnection Connection = new MySql.Data.MySqlClient.MySqlConnection();
+    public static string? DatabaseName;
+    public static void ConnectToDatabase(string ip, string databaseName, string username, string? password, bool createNewIfNotFound = false) {
+        Console.Write("Connecting to Database.....");
+        Connection.ConnectionString = @$"server={ip};uid={username}";
+        if (password != null) Connection.ConnectionString += $";pwd={password}";
+        Connection.Open();
+        Console.Write("\t*SUCCESS*\n");
+
+        bool dbFound = DatabaseExists(databaseName);
+        if (!dbFound && createNewIfNotFound) {            
+            Console.WriteLine("Database not found, Creating new...");
+            CreateDatabase(); // Create new database if one doesent already existDataColumn
+            dbFound = true;    
+        }
+        if (dbFound) {
+            Connection.ChangeDatabase(DatabaseName); // Select Database
+            InitMetaData();
+        }
+            
+    }
 
 
+
+    //!! -----------------!!//
+    //!! DATABASE METHODS !!//
+    //!! -----------------!!//
+    public static bool DatabaseExists(string databaseName) {
+        try {
+            MySqlCommand myCommand = Connection.CreateCommand();
+            myCommand.CommandText = $"SHOW TABLE STATUS FROM `{databaseName}`;";
+            var asd = myCommand.ExecuteScalar();
+            return true;
+        } catch (Exception ex) {
+            if (ex == null) return false;
+            return false;
+        }
+    }
+    public static void CreateDatabase() {
+        MySqlCommand myCommand = Connection.CreateCommand();
+        myCommand.CommandText = $"CREATE DATABASE {Connection.Database};";
+        myCommand.ExecuteScalar();
+    }
+    public static void DeleteDatabase() {
+        MySqlCommand myCommand = Connection.CreateCommand();
+        myCommand.CommandText = $"DROP DATABASE {Connection.Database};";
+        myCommand.ExecuteScalar();
+    }
+
+
+
+    //!! --------------!!//
+    //!! TABLE METHODS !!//
+    //!! --------------!!//
+    public static void CreateTable(string tableName) {
+        Console.WriteLine($"Trying to create a new table... {tableName}");
+        //SqlMetaData.TableInfo? tableInfo = GetTableInfo(tableName)!;
+        //if (tableInfo == null) throw new Exception($"Table ({tableName}) Not Found!");
+        string idName = "Id";
+        MySqlCommand myCommand = new MySqlCommand(@$"
+            CREATE TABLE `{tableName}` (
+                {idName} BINARY(16) NOT NULL, 
+                PRIMARY KEY (`{idName}`) USING BTREE
+            ) COLLATE='utf8_general_ci' ENGINE=InnoDB;", Connection);
+        myCommand.ExecuteScalar();
+        Console.WriteLine($"Table created!");
+
+        InitMetaData(); // TODO DO ONLY INTERNALLY
+    }
+    public static void CreateTable<T>(string? tableName = null) {
+        // TODO update metadata
+        List<PropertyInfo> propertyInfos = typeof(T).GetProperties().ToList();
+        
+        if (tableName == null) {
+            tableName = (string)typeof(T).GetField("TableName")?.GetValue(null)!;
+            if (tableName == null) tableName = typeof(T).ToString();
+        }
+        Console.WriteLine($"Trying to create a new table... {tableName}");
+
+        //SqlMetaData.TableInfo? tableInfo = GetTableInfo(tableName)!;
+        //if (tableInfo == null) throw new Exception($"Table ({tableName}) Not Found!");
+        string idName = "Id";
+
+        int removed = propertyInfos.RemoveAll(x => x.Name.ToLower() == idName.ToLower());
+        
+        string command = @$"CREATE TABLE `{tableName}` (";
+        if (removed > 0) command += $"`{idName}` BINARY(16) NOT NULL, ";
+
+        int i = 0;
+        foreach (PropertyInfo info in propertyInfos) {
+            if (info.CanWrite && info.CanRead) {
+                string type = GetSqlDataType(info.PropertyType);
+                // TODO if null not allowed get default
+
+                bool unsigned = type.Contains("!"); type = type.Replace("!","");
+
+                command += $"`{info.Name}` {type}";
+                if (unsigned) command += " UNSIGNED"; // `Unsigned` INT(10) UNSIGNED
+                command += " NULL DEFAULT NULL";
+                // not nullable                 = `Key` INT NOT NULL,
+                // unsigned                     = `Key` INT UNSIGNED NULL,
+                // unsigned AND not nullable    = `Key` INT UNSIGNED NOT NULL,
+                if (type == "TINYINT(1)") command += $", CHECK ({info.Name}=1 OR {info.Name}=0)"; // Check if boolean and allow 1 and 0 only
+            }
+            i++;
+            if (i != propertyInfos.Count()) command += ", ";
+        }
+        command += $"PRIMARY KEY (`{idName}`) USING BTREE) COLLATE='utf8_general_ci' ENGINE=InnoDB;";
+
+        MySqlCommand myCommand = new MySqlCommand(command, Connection);
+        myCommand.ExecuteScalar();
+        Console.WriteLine($"Table created!");
+
+        InitMetaData(); // TODO DO ONLY INTERNALLY
+    }
+    public static void DeleteTable(string tableName) {
+        Console.WriteLine($"Trying to delete a table... {tableName}");
+        MySqlCommand myCommand = new MySqlCommand($"DROP TABLE {tableName};", Connection);
+        myCommand.ExecuteScalar();
+        Console.WriteLine($"Table deleted!");
+    }
+    public static bool TableExists(string tableName) {
+        try {
+            MySqlCommand myCommand = new MySqlCommand($"SELECT 1 FROM {tableName} WHERE 1=2;", Connection);
+            myCommand.ExecuteScalar();
+            return true;
+        } catch (Exception ex) {
+            if (ex == null) return false;
+            return false;
+        }
+    }
+
+
+
+
+    //!! ---------------!!//
+    //!! COLUMN METHODS !!//
+    //!! ---------------!!//
+    public static void SetData(object data) { // ALSO USED TO UPDATE DATA
+        // TODO Update only the values that have changed!
+        Type type = data.GetType();
+
+        //--- Get Table Name Info
+        string tableName = (string)type.GetField("TableName")?.GetValue(null)!;
+        if (tableName == null) tableName = type.ToString();
+        SqlMetaData.TableInfo? tableInfo = GetTableInfo(tableName)!;
+        if (tableInfo == null) throw new Exception($"Table ({tableName}) Not Found!");
+        string idName = tableInfo.GuidColumnName!;
+        
+
+        //--- Get uid and check if UID exists already
+        Guid? uid = (Guid)(data.GetType().GetProperties().Single(x => x.Name.ToLower() == idName.ToLower()).GetValue(data))!;
+        bool update = (uid != null && TableHasGuid((Guid)uid,tableName));
+
+        //--- Get Columns
+        SqlMetaData.ColumnInfo[]? columnInfo = tableInfo.ColumnInfo!;
+        if (columnInfo == null || columnInfo.Count() == 0) throw new Exception($"Not metadata found for columnInfo: ({tableName})");
+        string[]? columns = columnInfo.Select(x => x.ColumnName).ToArray()!;
+        if (columns == null) throw new Exception($"No columns found for table: {tableName}");
+        columns = (new string[] { idName }).ToArray().Union(columns).ToArray();
+
+        //--- Parse so that it supports serilization
+        string values = String.Join(",@",columns);
+        values = "@" + values;
+
+        string command = "";
+        if (update) {
+            command = $"UPDATE {tableName} SET ";
+            for (int i = 0; i != columns.Count(); i++) {
+                command += $"{columns[i]}=@{columns[i]}";
+                if (i != columns.Count()-1) command += ",";
+            }
+            command += $" WHERE HEX({idName})='{Convert.ToHexString(((Guid)uid!)!.ToByteArray())}';";
+        } else {
+            command = $"INSERT INTO {tableName} ({String.Join(",", columns)}) VALUES ({values})";
+        }
+        MySqlCommand myCommand = new MySqlCommand(command, Connection);
+
+        foreach (PropertyInfo prop in type.GetProperties()) {
+            if (!prop.CanWrite || !prop.CanRead) continue;
+            object? propValue = prop.GetValue(data);
+            if (propValue == null) throw new Exception("ERROR");
+            if (prop.Name .ToLower()== idName.ToLower()) propValue = ((Guid)(propValue as Guid?)!).ToByteArray();
+            myCommand.Parameters.AddWithValue(("@"+prop.Name),propValue);
+        }
+
+        Console.WriteLine($"{command[0..6]} DATA: \t" + JsonSerializer.Serialize(data) + "\n");
+
+        int effect = myCommand.ExecuteNonQuery();
+        if (effect != 1) throw new Exception("Something went wrong when trying to insert data!");
+    }
+    public static void DeleteData(string tableName, Guid uid) {
+        Console.WriteLine("DELETING DATA FOR ID: " + uid);
+        string? idName = GetTableInfo(tableName)?.GuidColumnName;
+        if (idName == null) throw new Exception("Table Not Found!");
+
+        string hexId = Convert.ToHexString(uid.ToByteArray());
+        MySqlCommand myCommand = new MySqlCommand($"DELETE FROM {tableName} WHERE HEX({idName})='{hexId}';", Connection);
+        int result = myCommand.ExecuteNonQuery();
+        if (result != 1) throw new Exception($"Unable to remove MySQL row WHERE {idName}='{uid.ToByteArray()}'");
+        Console.WriteLine("Object deleted succesfully!");
+    }
+    public static void DeleteData(object data) {
+        Type type = data.GetType();
+        //--- Get Table Name Info
+        string tableName = (string)type.GetField("TableName")?.GetValue(null)!;
+        if (tableName == null) tableName = type.ToString();
+        SqlMetaData.TableInfo? tableInfo = GetTableInfo(tableName)!;
+        if (tableInfo == null) throw new Exception($"Table ({tableName}) Not Found!");
+        string idName = tableInfo.GuidColumnName!;
+
+        Guid? uid = (Guid)(data.GetType().GetProperties().Single(x => x.Name.ToLower() == idName.ToLower()).GetValue(data))!;
+        if (uid == null) throw new Exception($"Unable to find object ID! {tableName}");
+        DeleteData(tableName,(Guid)uid);
+    }
+    // TODO create whole new object
+    public static List<dynamic?>? GetColumnData(string tableName, Guid uid) {
+        string? idName = GetTableInfo(tableName)?.GuidColumnName;
+        if (idName == null) throw new Exception("Table Not Found!");
+
+        string hexId = Convert.ToHexString(uid.ToByteArray());
+        MySqlCommand myCommand = new MySqlCommand($"SELECT * FROM {tableName} WHERE HEX({idName})='{hexId}';", Connection);
+        MySqlDataReader reader = myCommand.ExecuteReader();
+
+        List<dynamic?> data = new List<dynamic?>();
+
+        // TODO create new object and add values where columnName is data name...
+        bool dataFound = false;
+        while (reader.Read()) {
+            dataFound = true;
+            var dtSchema = reader.GetSchemaTable();
+            foreach (DataRow row in dtSchema.Rows) {
+                string? columnName = row["ColumnName"]?.ToString()!;
+                if (columnName.ToLower() == idName.ToLower()) continue;
+
+                data.Add(reader.GetValue(columnName));
+            }
+        }
+        reader.Close();
+        if (!dataFound) throw new TargetException($"NO DATA FOUND FROM TABLE: {tableName}, USING GUID: {uid.ToString("N")}");
+        
+        return data;
+    }
+
+
+
+    //!! -----------------!!//
+    //!! METADATA METHODS !!//
+    //!! -----------------!!//
+    public static bool TableHasGuid(Guid uid, string tableName) {
+        SqlMetaData.TableInfo? tableInfo = GetTableInfo(tableName)!;
+        if (tableInfo == null) throw new Exception($"Table ({tableName}) Not Found!");
+        string idName = tableInfo.GuidColumnName!;
+
+        string hexId = Convert.ToHexString(uid.ToByteArray());
+        MySqlCommand myCommand = new MySqlCommand(@$"SELECT {idName} FROM {tableName} WHERE HEX({idName})='{hexId}';", Connection);
+        var found = myCommand.ExecuteScalar();
+        return (found != null);
+    }
+    public static SqlMetaData.TableInfo? GetTableInfo(string tableName) {
+        return SqlMetaData.TableInfoData?[tableName.ToLower()]!;
+    }
+    public static SqlMetaData.ColumnInfo? GetColumnInfo(string tableName, string columnName) {
+        return SqlMetaData.TableInfoData?[tableName].ColumnInfo?.Single(x => x.ColumnName?.ToLower() == columnName.ToLower());
+    }
+
+    public static string[] GetTables() {
+        MySqlCommand myCommand = new MySqlCommand($"SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_SCHEMA='{Connection.Database}' ", Connection);
+        MySqlDataReader reader = myCommand.ExecuteReader();
+        List<string> listOfTables = new List<string>();
+        while (reader.Read()) {
+            string? tableName = reader["TABLE_NAME"].ToString();
+            if (tableName != null) listOfTables.Add(tableName);
+        }
+        reader.Close();
+        return listOfTables.ToArray();
+    }
+
+    
     public static void InitMetaData() {
         //TODO CALL AUTOMATICALLY FROM ANY METHOD IF NOT INITIALIZED
         string[] listOfTables = GetTables();
@@ -57,158 +335,7 @@ public partial class Program {
     }
 
 
-
-    //!! -----------------!!//
-    //!! DATABASE METHODS !!//
-    //!! -----------------!!//
-    public static bool DatabaseExists() {
-        try {
-            MySqlCommand myCommand = Connection.CreateCommand();
-            myCommand.CommandText = $"SHOW TABLE STATUS FROM `{DatabaseName}`;";
-            var asd = myCommand.ExecuteScalar();
-            return true;
-        } catch (Exception ex) {
-            if (ex == null) return false;
-            return false;
-        }
-    }
-    public static void CreateDatabase() {
-        MySqlCommand myCommand = Connection.CreateCommand();
-        myCommand.CommandText = $"CREATE DATABASE {Connection.Database};";
-        myCommand.ExecuteScalar();
-    }
-    public static void DeleteDatabase() {
-        MySqlCommand myCommand = Connection.CreateCommand();
-        myCommand.CommandText = $"DROP DATABASE {Connection.Database};";
-        myCommand.ExecuteScalar();
-    }
-
-
-
-
-
-
-
-
-
-
-
-    //!! --------------!!//
-    //!! TABLE METHODS !!//
-    //!! --------------!!//
-
-    public static void CreateTable(string tableName) {
-        Console.WriteLine($"Trying to create a new table... {tableName}");
-        SqlMetaData.TableInfo? tableInfo = GetTableInfo(tableName)!;
-        if (tableInfo == null) throw new Exception($"Table ({tableName}) Not Found!");
-        string idName = tableInfo.GuidColumnName!;
-        MySqlCommand myCommand = new MySqlCommand(@$"
-            CREATE TABLE `{tableName}` (
-                {idName} BINARY(16) NOT NULL, 
-                PRIMARY KEY (`{idName}`) USING BTREE
-            ) COLLATE='utf8_general_ci' ENGINE=InnoDB;", Connection);
-        myCommand.ExecuteScalar();
-        Console.WriteLine($"Table created!");
-
-        InitMetaData(); // TODO DO ONLY INTERNALLY
-    }
-    public static void CreateTable<T>(string? tableName = null) {
-        // TODO update metadata
-        Console.WriteLine($"Trying to create a new table... {tableName}");
-        List<PropertyInfo> propertyInfos = typeof(T).GetProperties().ToList();
-        
-        if (tableName == null) {
-            tableName = (string)typeof(T).GetField("TableName")?.GetValue(null)!;
-            if (tableName == null) tableName = typeof(T).ToString();
-        }
-
-        SqlMetaData.TableInfo? tableInfo = GetTableInfo(tableName)!;
-        if (tableInfo == null) throw new Exception($"Table ({tableName}) Not Found!");
-        string idName = tableInfo.GuidColumnName!;
-
-        int removed = propertyInfos.RemoveAll(x => x.Name.ToLower() == idName.ToLower());
-        
-        string command = @$"CREATE TABLE `{tableName}` (";
-        if (removed > 0) command += $"`{idName}` BINARY(16) NOT NULL, ";
-
-        int i = 0;
-        foreach (PropertyInfo info in propertyInfos) {
-            if (info.CanWrite && info.CanRead) {
-                string type = GetSqlDataType(info.PropertyType);
-                // TODO if null not allowed get default
-
-                bool unsigned = type.Contains("!"); type = type.Replace("!","");
-
-                command += $"`{info.Name}` {type}";
-                if (unsigned) command += " UNSIGNED"; // `Unsigned` INT(10) UNSIGNED
-                command += " NULL DEFAULT NULL";
-                // not nullable                 = `Key` INT NOT NULL,
-                // unsigned                     = `Key` INT UNSIGNED NULL,
-                // unsigned AND not nullable    = `Key` INT UNSIGNED NOT NULL,
-                if (type == "TINYINT(1)") command += $", CHECK ({info.Name}<=1)"; // Check if boolean and allow 1 and 0 only
-            }
-            i++;
-            if (i != propertyInfos.Count()) command += ", ";
-        }
-        command += $"PRIMARY KEY (`{idName}`) USING BTREE) COLLATE='utf8_general_ci' ENGINE=InnoDB;";
-
-        MySqlCommand myCommand = new MySqlCommand(command, Connection);
-        myCommand.ExecuteScalar();
-        Console.WriteLine($"Table created!");
-
-        InitMetaData(); // TODO DO ONLY INTERNALLY
-    }
-    public static void DeleteTable(string tableName) {
-        Console.WriteLine($"Trying to delete a table... {tableName}");
-        MySqlCommand myCommand = new MySqlCommand($"DROP TABLE {tableName};", Connection);
-        myCommand.ExecuteScalar();
-        Console.WriteLine($"Table deleted!");
-    }
-    public static bool TableExists(string tableName) {
-        try {
-            MySqlCommand myCommand = new MySqlCommand($"SELECT 1 FROM {tableName} WHERE 1=2;", Connection);
-            myCommand.ExecuteScalar();
-            return true;
-        } catch (Exception ex) {
-            if (ex == null) return false;
-            return false;
-        }
-    }
-
-
-
-
-
-
-
-
-
-
-    //!! -----------------!!//
-    //!! METADATA METHODS !!//
-    //!! -----------------!!//
-    public static SqlMetaData.TableInfo? GetTableInfo(string tableName) {
-        return SqlMetaData.TableInfoData?[tableName.ToLower()]!;
-    }
-    public static SqlMetaData.ColumnInfo? GetColumnInfo(string tableName, string columnName) {
-        return SqlMetaData.TableInfoData?[tableName].ColumnInfo?.Single(x => x.ColumnName?.ToLower() == columnName.ToLower());
-    }
-
-    public static string[] GetTables() {
-        MySqlCommand myCommand = new MySqlCommand($"SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_SCHEMA='{Connection.Database}' ", Connection);
-        MySqlDataReader reader = myCommand.ExecuteReader();
-        List<string> listOfTables = new List<string>();
-        while (reader.Read()) {
-            string? tableName = reader["TABLE_NAME"].ToString();
-            if (tableName != null) listOfTables.Add(tableName);
-        }
-        reader.Close();
-        return listOfTables.ToArray();
-    }
-
-
-
-    public static Type GetDataType(string typeText) {
+    private static Type GetDataType(string typeText) {
         typeText = typeText.ToLower();
         if (typeText.Contains("text")) return typeof(string);
         if (typeText.Contains("int")) return typeof(Int32);
@@ -252,6 +379,12 @@ public partial class Program {
 
 
 
+
+//!! ---------------------!!//
+//!! CLASSES FOR METADATA !!//
+//!! ---------------------!!//
+
+
 public class SqlMetaData {
     public static Dictionary<string, SqlMetaData.TableInfo>? TableInfoData { get; set; }
 
@@ -271,10 +404,24 @@ public class SqlMetaData {
 }
 
 
-public abstract class MySqlObjectClass {
+public abstract class MySqlBaseObjectClass {
+    internal int LastHashCode;
     public Guid Id { get; internal set; }
     public static string? TableName { get; internal set; }
-    public MySqlObjectClass() {
+    public MySqlBaseObjectClass() {
         TableName = this.GetType().UnderlyingSystemType.Name;
+        LastHashCode = this.GetHashCode();
+        Id = Guid.NewGuid();
+    }
+
+    // To check if data has been altered in object
+    public override int GetHashCode() {
+        int hashFinal = base.GetHashCode();
+        foreach(PropertyInfo info in this.GetType().GetProperties()) {
+            if (!info.CanRead || !info.CanWrite) continue;
+            int? tempHash = info.GetValue(this)?.GetHashCode();
+            if (tempHash != null) hashFinal += (int)tempHash;
+        }
+        return Math.Abs(hashFinal);
     }
 }

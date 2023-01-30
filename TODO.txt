@@ -1,0 +1,16 @@
+create table = DONE
+delete table = DONE
+table exists = DONE
+
+Create Database = DONE
+Delete Database = DONE
+Database Exists = DONE
+
+Add Data to Table = DONE
+Has Data with Key = DONE
+Remove Data From DB = DONE
+Update Data = DONE
+
+
+TODO: Add query lineup for mysql requests
+TODO: Add metadata from guids (dictionary), and only update the data in DB that has been changed (Get hash from object?)

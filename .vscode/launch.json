@@ -10,10 +10,10 @@
             "request": "launch",
             "preLaunchTask": "build",
             "justMyCode": false,
-            "program": "${workspaceFolder}/bin/Debug/net6.0/task15.dll",
+            "program": "${workspaceFolder}/bin/Debug/net6.0/MySqlAPI.dll",
             "args": [],
             "cwd": "${workspaceFolder}",
-            "console": "internalConsole",
+            "console": "integratedTerminal",
             "stopAtEntry": false,
             "logging": {
                 "moduleLoad": false,
