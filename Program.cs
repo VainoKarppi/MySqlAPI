@@ -30,8 +30,9 @@ public class Program {
             SetData(testData);
 
             Student restoredData = new Student(uid);
-            Console.WriteLine($"[RESTORED DATA] Id:{restoredData.Id}, Name:{restoredData.Name}, BirthDate:{restoredData.BirthDate}, Money:{restoredData.Money}, Alive:{restoredData.Alive}");
+            Console.WriteLine($"[RESTORED DATA] ({restoredData.Id}) | Name:{restoredData.Name}, BirthDate:{restoredData.BirthDate}, Money:{restoredData.Money}, Alive:{restoredData.Alive}");
             Console.WriteLine("AGE: " + restoredData.Age + "\nOLD HASH: " + restoredData.GetHashCode());
+            Console.WriteLine();
             
             restoredData.Money = 15500.35f;
             restoredData.Alive = false;

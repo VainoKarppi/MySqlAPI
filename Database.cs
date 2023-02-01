@@ -577,12 +577,11 @@ public class SqlMetaData {
 /// </summary>
 public abstract class MySqlBaseObjectClass {
     internal int LastHashCode;
-    public Guid Id { get; internal set; }
+    public Guid Id { get; init; } = Guid.NewGuid();
     public static string? TableName { get; internal set; }
     public MySqlBaseObjectClass() {
         TableName = this.GetType().UnderlyingSystemType.Name;
         LastHashCode = this.GetHashCode();
-        Id = Guid.NewGuid();
     }
 
     // To check if data has been altered in object
