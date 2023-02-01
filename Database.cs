@@ -361,6 +361,44 @@ public static class Database {
     }
 
 
+    public static void RestoreData(this object dataNew, Guid uid) {
+        Type type = dataNew.GetType();
+
+        string tableName = (string)type.GetField("TableName")?.GetValue(dataNew)!;
+        if (tableName == null) tableName = type.ToString();
+
+        string? idName = GetTableInfo(tableName)?.GuidColumnName;
+        if (idName == null) throw new Exception("Table Not Found!");
+
+        string hexId = Convert.ToHexString(uid.ToByteArray());
+        MySqlCommand myCommand = new MySqlCommand($"SELECT * FROM {tableName} WHERE HEX({idName})='{hexId}';", Connection);
+        MySqlDataReader reader = myCommand.ExecuteReader();
+
+        bool idSet = false;
+        while (reader.Read()) {
+            var dtSchema = reader.GetSchemaTable();
+
+            foreach (DataRow row in dtSchema.Rows) {
+                string? columnName = row["ColumnName"]?.ToString()!;
+                PropertyInfo? property = type.GetProperty(columnName);
+                if (columnName.ToLower() == idName.ToLower()) {
+                    if (property == null) throw new Exception($"UNABLE TO RESTORE UID FOR OBJECT: {uid}");
+                    property.SetValue(dataNew, uid, null);
+                    idSet = true;
+                    continue;
+                }
+                if (property == null) continue;
+
+                var data = reader.GetValue(columnName);
+                property.SetValue(dataNew, data, null);
+            }
+        }
+        reader.Close();
+
+        if (!idSet) throw new Exception($"UNABLE TO RESTORE UID FOR OBJECT: {uid}");
+    }
+
+
 
 
 

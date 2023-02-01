@@ -3,7 +3,9 @@ using System.Reflection;
 using System.Text.Json;
 using MySql.Data.MySqlClient;
 
+using MySqlDatabaseAPI;
 using static MySqlDatabaseAPI.Database;
+
 
 // TODO add scheduler for execute command so no new scoket cant be running while another is executing
 
@@ -16,8 +18,6 @@ public class Program {
             ConnectToDatabase("karppi2.asuscomm.com","testdatabase","test","test",true); // Open database for develop (Might remove later)
             
             if (!TableExists(Student.TableName)) CreateTable<Student>();
-
-            Guid temp = new Guid("0a69f3dc-1256-435b-8919-5b42cc73f573"); // TEMP UID FOR DEVELOP THAT IS ALWAYS IN DATABASE!
            
             Student testData = new Student();
             Guid uid = testData.Id;
@@ -57,7 +57,7 @@ public class Program {
 
 
 
-public class Student : MySqlDatabaseAPI.MySqlBaseObjectClass
+public class Student : MySqlBaseObjectClass
 {
     // MySqlObjectClass always has the following properties:
     //  - Id = When new object is generated it gets random guid inserted into it
@@ -70,16 +70,11 @@ public class Student : MySqlDatabaseAPI.MySqlBaseObjectClass
     public bool Alive { get; set; } = false;
 
     // Methods that have both get and set can be only saved to DB!
-    public int Age { get {return DateTime.Now.Year - this.BirthDate!.Value.Year;} }
+    public int Age { get { return DateTime.Now.Year - this.BirthDate!.Value.Year; } }
 
     public Student() {}
     public Student(Guid id) {
-        //TODO Restore from DB automatically and retreive object instead of list
-        List<dynamic>? data = GetColumnData(TableName, id)!;
-        this.Id = id;
-        this.Name = data[0];
-        this.BirthDate = data[1];
-        this.Money = data[2];
+        Database.RestoreData(this,id); // CALL FOR RESTORE DATA AUTOMATICALLY
     }
 }
 
