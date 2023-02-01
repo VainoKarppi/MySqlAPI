@@ -64,10 +64,14 @@ public class Student : MySqlBaseObjectClass
     //  - TableName = If not overwritten, class name will be used.
     //  - LastHashCode = Can be used to detect if data in class properties has been altered when comparing to myObject.GetHashCode()
     public new static string TableName = "students"; // Override over (Student) name for table
+
+    //--- These Values Are Saved To DB!
     public string? Name { get; set; }
     public DateTime? BirthDate { get; set; }
     public float Money { get; set; }
     public bool Alive { get; set; } = false;
+
+
 
     // Methods that have both get and set can be only saved to DB!
     public int Age { get { return DateTime.Now.Year - this.BirthDate!.Value.Year; } }
