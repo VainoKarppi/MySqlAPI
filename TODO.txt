@@ -11,6 +11,10 @@ Has Data with Key = DONE
 Remove Data From DB = DONE
 Update Data = DONE
 
+TODO: RestoreObject. Restore object with fields automatically filled and return that object.
 
+
+TODO: Create users table that takes username and password and returns guid
+    -   Encrypt everything and add better encryption for guid string???
 TODO: Add query lineup for mysql requests
 TODO: Add metadata from guids (dictionary), and only update the data in DB that has been changed (Get hash from object?)

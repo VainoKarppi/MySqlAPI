@@ -11,8 +11,10 @@ using static MySqlDatabaseAPI.Database;
 public class Program {
     public static void Main(string[] args) {
         try {
-            ConnectToDatabase("192.168.1.4","test","test","test",true);
-
+            //ConnectToDatabase("192.168.1.4","test","test","test",true);
+            Console.WriteLine("WARNING: Cannot connect from XAMK network!");
+            ConnectToDatabase("karppi2.asuscomm.com","testdatabase","test","test",true); // Open database for develop (Might remove later)
+            
             if (!TableExists(Student.TableName)) CreateTable<Student>();
 
             Guid temp = new Guid("0a69f3dc-1256-435b-8919-5b42cc73f573"); // TEMP UID FOR DEVELOP THAT IS ALWAYS IN DATABASE!
@@ -21,18 +23,17 @@ public class Program {
             Guid uid = testData.Id;
 
             testData.BirthDate = new DateTime(1999,04,26);
-            testData.Name = "Lauri";
-            testData.Money = 27500f;
+            testData.Name = "Firstname Lastname";
+            testData.Money = 27500.60f;
             testData.Alive = true;
 
             SetData(testData);
 
             Student restoredData = new Student(uid);
             Console.WriteLine($"[RESTORED DATA] Id:{restoredData.Id}, Name:{restoredData.Name}, BirthDate:{restoredData.BirthDate}, Money:{restoredData.Money}, Alive:{restoredData.Alive}");
-            Console.WriteLine("AGE: " + restoredData.Age);
-            Console.WriteLine("OLD HASH: " + restoredData.GetHashCode());
+            Console.WriteLine("AGE: " + restoredData.Age + "\nOLD HASH: " + restoredData.GetHashCode());
             
-            restoredData.Money = 15500f;
+            restoredData.Money = 15500.35f;
             restoredData.Alive = false;
             SetData(restoredData);
 
@@ -40,12 +41,13 @@ public class Program {
 
             Console.WriteLine();
             Console.WriteLine(@"TYPE ""Y"" TO DELETE THIS ROW");
-            
+
             string? del = Console.ReadLine(); // Wait for delete...
             if (del!.Equals("y",StringComparison.InvariantCultureIgnoreCase)) DeleteData(restoredData);
 
         } catch (MySqlException ex) {
-            Console.WriteLine("ERROR: " + ex.Message + "\n");
+            if (ex is MySqlException)
+            Console.WriteLine("\nERROR: " + ex.Message + "\n\n");
             Console.WriteLine(ex);
         }
     }
@@ -58,10 +60,10 @@ public class Program {
 public class Student : MySqlDatabaseAPI.MySqlBaseObjectClass
 {
     // MySqlObjectClass always has the following properties:
-    //  Id = When new object is generated it gets random guid inserted into it
-    //  TableName = If not overwritten, class name will be used.
-    //  LastHashCode = Can be used to detect if data in class properties has been altered when comparing to myObject.GetHashCode()
-    public new static string TableName = "students"; // Override over (Student)
+    //  - Id = When new object is generated it gets random guid inserted into it
+    //  - TableName = If not overwritten, class name will be used.
+    //  - LastHashCode = Can be used to detect if data in class properties has been altered when comparing to myObject.GetHashCode()
+    public new static string TableName = "students"; // Override over (Student) name for table
     public string? Name { get; set; }
     public DateTime? BirthDate { get; set; }
     public float Money { get; set; }
@@ -72,7 +74,7 @@ public class Student : MySqlDatabaseAPI.MySqlBaseObjectClass
 
     public Student() {}
     public Student(Guid id) {
-        //TODO Restore from DB automatically
+        //TODO Restore from DB automatically and retreive object instead of list
         List<dynamic>? data = GetColumnData(TableName, id)!;
         this.Id = id;
         this.Name = data[0];
@@ -80,8 +82,5 @@ public class Student : MySqlDatabaseAPI.MySqlBaseObjectClass
         this.Money = data[2];
     }
 }
- 
-// GET TABLES LIST: show tables like '%'
 
-// COLLUMS: SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME =N'test';
 
