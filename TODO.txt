@@ -8,10 +8,10 @@ Database Exists = DONE
 
 Add Data to Table = DONE
 Has Data with Key = DONE
+Get Data with Key = DONE
 Remove Data From DB = DONE
 Update Data = DONE
-
-TODO: RestoreObject. Restore object with fields automatically filled and return that object.
+RestoreData = DONE
 
 
 TODO: Create users table that takes username and password and returns guid
