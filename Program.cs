@@ -19,15 +19,15 @@ public class Program {
             
             if (!TableExists(Student.TableName)) CreateTable<Student>();
            
-            Student testData = new Student();
-            Guid uid = testData.Id; // Holder to be able to restore it later on
+            Student testData = new Student(); // Create new object that is saved to database (uses MySqlBaseObjectClass class as parent)
+            Guid uid = testData.Id; //---- Holder to be able to restore it later on
 
             testData.BirthDate = new DateTime(1999,04,26);
             testData.Name = "Firstname Lastname";
             testData.Money = 27500.60f;
             testData.Alive = true;
 
-            SetData(testData);
+            SetData(testData); //---- Insert data to the database
 
             Student restoredData = new Student(uid);
             Console.WriteLine($"[RESTORED DATA] ({restoredData.Id}) | Name:{restoredData.Name}, BirthDate:{restoredData.BirthDate}, Money:{restoredData.Money}, Alive:{restoredData.Alive}");
@@ -36,14 +36,14 @@ public class Program {
             
             restoredData.Money = 15500.35f;
             restoredData.Alive = false;
-            SetData(restoredData);
+            SetData(restoredData); //---- Update data for the column where guid is...
 
-            Console.WriteLine("NEW HASH: " + restoredData.GetHashCode());
+            Console.WriteLine("NEW HASH: " + restoredData.GetHashCode()); //---- Hash is no longer the same since the object properties have been changed
 
             Console.WriteLine();
             Console.WriteLine(@"TYPE ""Y"" TO DELETE THIS ROW");
 
-            string? del = Console.ReadLine(); // Wait for delete...
+            string? del = Console.ReadLine(); //---- Wait for delete...
             if (del!.Equals("y",StringComparison.InvariantCultureIgnoreCase)) DeleteData(restoredData);
 
         } catch (MySqlException ex) {
@@ -69,7 +69,7 @@ public class Student : MySqlBaseObjectClass
     //--- These Values Are Saved To DB!
     public string? Name { get; set; }
     public DateTime? BirthDate { get; set; }
-    public float Money { get; set; }
+    public float? Money { get; set; }
     public bool Alive { get; set; } = false;
 
 
