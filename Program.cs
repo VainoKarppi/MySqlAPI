@@ -7,7 +7,7 @@ using MySqlDatabaseAPI;
 using static MySqlDatabaseAPI.Database;
 
 
-// TODO add scheduler for execute command so no new scoket cant be running while another is executing
+// TODO add scheduler for execute command so no new sql command can be running while another is executing
 
 
 public class Program {
@@ -20,7 +20,7 @@ public class Program {
             if (!TableExists(Student.TableName)) CreateTable<Student>();
            
             Student testData = new Student();
-            Guid uid = testData.Id;
+            Guid uid = testData.Id; // Holder to be able to restore it later on
 
             testData.BirthDate = new DateTime(1999,04,26);
             testData.Name = "Firstname Lastname";
