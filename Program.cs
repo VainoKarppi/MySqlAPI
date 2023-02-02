@@ -29,7 +29,7 @@ public class Program {
 
             SetData(testData); //---- Insert data to the database
 
-            Student restoredData = new Student(uid);
+            Student restoredData = new Student(uid); //--- Create new object from restored data from DB using GUID
             Console.WriteLine($"[RESTORED DATA] ({restoredData.Id}) | Name:{restoredData.Name}, BirthDate:{restoredData.BirthDate}, Money:{restoredData.Money}, Alive:{restoredData.Alive}");
             Console.WriteLine("AGE: " + restoredData.Age + "\nOLD HASH: " + restoredData.GetHashCode());
             Console.WriteLine();
