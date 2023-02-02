@@ -1,0 +1,25 @@
+
+
+Navigate To MySqlAPI Folder using CMD (where MySqlAPI.csproj is located).
+
+run: "dotnet restore" to download MySQL extension packet.
+run: "dotnet run" command in cmd.
+
+This API requires at least dotnet v6.0 SDK. If this is not installed, it can be installed from: https://dotnet.microsoft.com/en-us/download/dotnet/6.0
+
+WARNING! this repo does not contain the binary files, and thus atleast one "dotnet run" or "dotnet build" is required to build the binary/metadata files!
+
+This project was made using VSCode, and thus does not contain the .sln file! This project can be imported to a MSVS solution however.
+
+By default this project is set to connect my own MySQL server running on my rasperrypi at home.
+This connecting might be a bit slow. It can also be accessed using a 3rd party client tool to get full access.
+    
+    INFO: This project uses MySQL instead of Microsoft SQL Server!
+
+    MySQL credientials:
+        ip adress: karppi2.asuscomm.com
+        username: test
+        password: test
+        port: 3306
+    
+    From there you can find "testdatabase" as a default database which is set for this project for testing purposes!
